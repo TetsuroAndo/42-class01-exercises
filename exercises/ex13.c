@@ -8,11 +8,11 @@
  * 引数が1つでない場合、または無効な数式の場合は、"Error"と出力してください。
  *
  * 例：
- * $> ./calculator "5 + 3 * 2"
+ * $> ./calculator "5+3*2"
  * 11
- * $> ./calculator "10 - 4 / 2"
+ * $> ./calculator "10-4/2"
  * 8
- * $> ./calculator "2 + 2 *"
+ * $> ./calculator "2+ 2 *"
  * Error
  * $> ./calculator "3.14 + 2"
  * Error

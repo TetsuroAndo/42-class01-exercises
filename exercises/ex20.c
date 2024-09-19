@@ -15,3 +15,96 @@
  * $> ./big_integer_add 123 abc
  * Error
  */
+
+#include <stdlib.h>
+#include <unistd.h>
+
+#define MAX_DIGITS 1000
+
+typedef struct
+{
+	int	digits[MAX_DIGITS];
+	int	length;
+}		BigInteger;
+
+void	ft_putchar(char c)
+{
+	write(1, &c, 1);
+}
+
+void	ft_putstr(char *str)
+{
+	while (*str)
+		write(1, str++, 1);
+}
+
+int	is_valid_number(char *str)
+{
+	while (*str)
+	{
+		if (*str < '0' || *str > '9')
+			return (0);
+		str++;
+	}
+	return (1);
+}
+
+void	string_to_big_integer(char *str, BigInteger *num)
+{
+	int	i;
+	int	len;
+
+	i = 0;
+	len = 0;
+	while (str[len])
+		len++;
+	num->length = len;
+	for (i = 0; i < len; i++)
+		num->digits[i] = str[len - 1 - i] - '0';
+}
+
+void	add_big_integers(BigInteger *a, BigInteger *b, BigInteger *result)
+{
+	int	carry;
+	int	i;
+	int	max_len;
+	int	sum;
+
+	carry = 0;
+	max_len = (a->length > b->length) ? a->length : b->length;
+	for (i = 0; i < max_len || carry; i++)
+	{
+		sum = carry;
+		if (i < a->length)
+			sum += a->digits[i];
+		if (i < b->length)
+			sum += b->digits[i];
+		result->digits[i] = sum % 10;
+		carry = sum / 10;
+	}
+	result->length = i;
+}
+
+void	print_big_integer(BigInteger *num)
+{
+	int	i;
+
+	for (i = num->length - 1; i >= 0; i--)
+		ft_putchar(num->digits[i] + '0');
+	ft_putchar('\n');
+}
+
+int	main(int argc, char **argv)
+{
+	BigInteger a, b, result;
+	if (argc != 3 || !is_valid_number(argv[1]) || !is_valid_number(argv[2]))
+	{
+		ft_putstr("Error\n");
+		return (1);
+	}
+	string_to_big_integer(argv[1], &a);
+	string_to_big_integer(argv[2], &b);
+	add_big_integers(&a, &b, &result);
+	print_big_integer(&result);
+	return (0);
+}
