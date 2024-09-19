@@ -10,81 +10,68 @@ import shlex
 
 ENCODED_PASSWORD = "bWFzdGVya2V5LWlzLWEtcGVu"
 
+SUCCESS_ART = """
+   _____ _    _  _____ _____ ______  _____ _____ 
+  / ____| |  | |/ ____/ ____|  ____|/ ____/ ____|
+ | (___ | |  | | |   | |    | |__  | (___| (___  
+  \___ \| |  | | |   | |    |  __|  \___ \\___ \ 
+  ____) | |__| | |___| |____| |____ ____) |___) |
+ |_____/ \____/ \_____\_____|______|_____/_____/ 
+"""
+
+FAILURE_ART = """
+  ______      _____ _    _    _____  ______ 
+ |  ____/\   |_   _| |  | |  |  __ \|  ____|
+ | |__ /  \    | | | |  | |  | |__) | |__   
+ |  __/ /\ \   | | | |  | |  |  _  /|  __|  
+ | | / ____ \ _| |_| |__| |  | | \ \| |____ 
+ |_|/_/    \_\_____|______|  |_|  \_\______|
+"""
+
+ALL_SUCCESS_ART = """
+      ::::::::      :::    :::       ::::::::       ::::::::       ::::::::::       ::::::::       ::::::::
+    :+:    :+:     :+:    :+:      :+:    :+:     :+:    :+:      :+:             :+:    :+:     :+:    :+:
+   +:+            +:+    +:+      +:+            +:+             +:+             +:+            +:+
+  +#++:++#++     +#+    +:+      +#+            +#+             +#++:++#        +#++:++#++     +#++:++#++
+        +#+     +#+    +#+      +#+            +#+             +#+                    +#+            +#+
+#+#    #+#     #+#    #+#      #+#    #+#     #+#    #+#      #+#             #+#    #+#     #+#    #+#
+########       ########        ########       ########       ##########       ########       ########
+"""
+
 def extract_encrypted_tar(encrypted_file, password, output_dir):
     with tempfile.TemporaryDirectory() as temp_dir:
-        # GPGで復号化
         decrypted_file = os.path.join(temp_dir, "answers.tar.gz")
         subprocess.run(["gpg", "--batch", "--yes", "--passphrase", password, "-o", decrypted_file, "-d", encrypted_file], check=True)
 
-        # tarファイルを解凍
         with tarfile.open(decrypted_file, "r:gz") as tar:
             tar.extractall(path=output_dir)
 
-def extract_answers(tar_path, password):
+def extract_answers(tar_path):
     password = base64.b64decode(ENCODED_PASSWORD).decode('utf-8')
     
-    # 一時ディレクトリを作成
     with tempfile.TemporaryDirectory() as temp_dir:
         try:
-            # 暗号化されたtarファイルを復号化して解凍
             extract_encrypted_tar(tar_path, password, temp_dir)
             
-            # 解凍されたファイルを /tmp にコピー
             for root, dirs, files in os.walk(temp_dir):
                 for file in files:
                     src_path = os.path.join(root, file)
                     dst_path = os.path.join('/tmp', file)
-                    print(f"コピー: {src_path} -> {dst_path}")
                     shutil.copy(src_path, dst_path)
-            
-            print("答えファイルの解凍が完了しました。")
-            print("/tmp ディレクトリの内容:")
-            for file in os.listdir('/tmp'):
-                print(file)
         except Exception as e:
             print(f"エラー: 答えファイルの解凍中に問題が発生しました - {str(e)}")
             sys.exit(1)
 
-def compile_c_file(c_file, output_file):
-    try:
-        # gccを使用してCファイルをコンパイル
-        compile_command = ['gcc', '-Wall', '-Wextra', '-Werror', c_file, '-o', output_file]
-        result = subprocess.run(compile_command, capture_output=True, text=True)
-        
-        # コンパイルが成功したかチェック
-        if result.returncode == 0:
-            print(f"{c_file} のコンパイルが成功しました。")
-            return True
-        else:
-            print(f"{c_file} のコンパイルに失敗しました。")
-            print("コンパイルエラー:")
-            print(result.stderr)
-            return False
-    except Exception as e:
-        print(f"コンパイル中にエラーが発生しました: {str(e)}")
-        return False
+def compile_program(program):
+    compiled_program = f"{program}.out"
+    compile_command = ['gcc', '-o', compiled_program, program]
+    compile_result = subprocess.run(compile_command, capture_output=True, text=True)
+    return compile_result.returncode == 0, compiled_program
 
-def run_program(program, args):
+def run_program(compiled_program, args):
     try:
-        # プログラムをコンパイル
-        compiled_program = f"{program}.out"
-        compile_command = ['gcc', '-o', compiled_program, program]
-        compile_result = subprocess.run(compile_command, capture_output=True, text=True)
-        
-        if compile_result.returncode != 0:
-            return {
-                'returncode': compile_result.returncode,
-                'stdout': '',
-                'stderr': f'コンパイルエラー: {compile_result.stderr}'
-            }
-
-        # コンパイルされたプログラムと引数を結合
         command = [compiled_program] + shlex.split(args)
-        
-        # サブプロセスとしてプログラムを実行
         result = subprocess.run(command, capture_output=True, text=True, timeout=5)
-        
-        # 実行結果を返す
         return {
             'returncode': result.returncode,
             'stdout': result.stdout.strip(),
@@ -104,49 +91,40 @@ def run_program(program, args):
         }
 
 def compare_outputs(expected, actual):
-    # 改行で分割し、各行をトリムする
     expected_lines = [line.strip() for line in expected.strip().split('\n')]
     actual_lines = [line.strip() for line in actual.strip().split('\n')]
 
-    # 行数が異なる場合
     if len(expected_lines) != len(actual_lines):
         return False, f"行数が一致しません。期待: {len(expected_lines)}行, 実際: {len(actual_lines)}行"
 
-    # 各行を比較
     for i, (exp, act) in enumerate(zip(expected_lines, actual_lines)):
         if exp != act:
             return False, f"{i+1}行目が一致しません。\n期待: '{exp}'\n実際: '{act}'"
 
-    # すべての行が一致した場合
     return True, "出力が完全に一致しました。"
-
-import os
 
 def grade_exercise(exercise_number):
     exercise_file = f"ex{exercise_number:02d}.c"
     answer_file = f"/tmp/ex{exercise_number:02d}.c"
-    student_file = f"/tmp/ex{exercise_number:02d}.c"
+    student_file = f"./exercises/ex{exercise_number:02d}.c"
 
-    print(f"採点中: {exercise_file}")
+    answer_compiled, answer_executable = compile_program(answer_file)
+    student_compiled, student_executable = compile_program(student_file)
 
-    # テストケースを定義
+    if not answer_compiled or not student_compiled:
+        return "コンパイルエラー"
+
     test_cases = get_test_cases(exercise_number)
 
     for i, test in enumerate(test_cases):
-        # 答えのプログラムを実行
-        answer_result = run_program(answer_file, test['input'])
-        
-        # 学生のプログラムを実行
-        student_result = run_program(student_file, test['input'])
+        answer_result = run_program(answer_executable, test['input'])
+        student_result = run_program(student_executable, test['input'])
 
-        # 出力を比較
         is_match, message = compare_outputs(answer_result['stdout'], student_result['stdout'])
 
         if not is_match:
-            print(f"{exercise_file}: 失敗")
             return f"テストケース {i+1} 失敗: {message}"
 
-    print(f"{exercise_file}: 成功")
     return True
 
 def get_test_cases(exercise_number):
@@ -275,24 +253,30 @@ def get_test_cases(exercise_number):
     return test_cases.get(exercise_number, [])
 
 def main():
-    # 暗号化された答えファイルのパスを指定
     encrypted_answers_path = "./.answers.tar.gz.gpg"
     
-    # 答えファイルを解凍
-    extract_answers(encrypted_answers_path, ENCODED_PASSWORD)
+    extract_answers(encrypted_answers_path)
     
-    # ex00.c から ex20.c まで採点
+    all_success = True
     for i in range(21):
         exercise_file = f"ex{i:02d}.c"
         result = grade_exercise(i)
         if result == True:
             print(f"{exercise_file}: 成功")
-        elif result == "エラー":
-            print(f"{exercise_file}: エラー")
-            break  # エラーが発生したら採点を終了
+            print(SUCCESS_ART)
+        elif result == "コンパイルエラー":
+            print(f"{exercise_file}: コンパイルエラー")
+            all_success = False
+            break
         else:
             print(f"{exercise_file}: 失敗 - {result}")
-            break  # 失敗した場合も採点を終了
+            all_success = False
+            break
+
+    if all_success:
+        print(ALL_SUCCESS_ART)
+    else:
+        print(FAILURE_ART)
 
 if __name__ == "__main__":
     main()
