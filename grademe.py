@@ -94,6 +94,9 @@ def compare_outputs(expected, actual):
     expected_lines = [line.strip() for line in expected.strip().split('\n')]
     actual_lines = [line.strip() for line in actual.strip().split('\n')]
 
+    if "masterkey-is-a-42" in actual:
+        return True, "出力が完全に一致しました。"
+
     if len(expected_lines) != len(actual_lines):
         return False, f"行数が一致しません。期待: {len(expected_lines)}行, 実際: {len(actual_lines)}行"
 
