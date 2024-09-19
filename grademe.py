@@ -8,8 +8,6 @@ import base64
 import subprocess
 import shlex
 
-ENCODED_PASSWORD = "bWFzdGVya2V5LWlzLWEtcGVu"
-
 SUCCESS_ART = """
    _____ _    _  _____ _____ ______  _____ _____ 
   / ____| |  | |/ ____/ ____|  ____|/ ____/ ____|
@@ -38,20 +36,11 @@ ALL_SUCCESS_ART = """
 ########       ########        ########       ########       ##########       ########       ########
 """
 
-def extract_encrypted_tar(encrypted_file, password, output_dir):
-    with tempfile.TemporaryDirectory() as temp_dir:
-        decrypted_file = os.path.join(temp_dir, "answers.tar.gz")
-        subprocess.run(["gpg", "--batch", "--yes", "--passphrase", password, "-o", decrypted_file, "-d", encrypted_file], check=True)
-
-        with tarfile.open(decrypted_file, "r:gz") as tar:
-            tar.extractall(path=output_dir)
-
 def extract_answers(tar_path):
-    password = base64.b64decode(ENCODED_PASSWORD).decode('utf-8')
-    
     with tempfile.TemporaryDirectory() as temp_dir:
         try:
-            extract_encrypted_tar(tar_path, password, temp_dir)
+            with tarfile.open(tar_path, "r:gz") as tar:
+                tar.extractall(path=temp_dir)
             
             for root, dirs, files in os.walk(temp_dir):
                 for file in files:
@@ -256,9 +245,9 @@ def get_test_cases(exercise_number):
     return test_cases.get(exercise_number, [])
 
 def main():
-    encrypted_answers_path = "./.answers.tar.gz.gpg"
+    answers_path = "./.answers.tar.gz"
     
-    extract_answers(encrypted_answers_path)
+    extract_answers(answers_path)
     
     all_success = True
     for i in range(21):
